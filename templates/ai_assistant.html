@@ -1,0 +1,61 @@
+{% extends "base.html" %}
+{% block title %}Civic Knowledge Assistant{% endblock %}
+{% block content %}
+<div class="row g-4">
+  <div class="col-lg-5">
+    <div class="section-shell">
+      <h3 class="mb-3">Civic knowledge assistant</h3>
+      <p class="text-muted">Describe a civic issue and the system will estimate the category, probable priority, and similar reports.</p>
+      <form method="post">
+        {% csrf_token %}
+        <div class="mb-3">
+          <label class="form-label" for="description">Issue description</label>
+          <textarea id="description" name="description" class="form-control" rows="6" placeholder="Example: Flooded road due to burst water pipe near the school gate."></textarea>
+        </div>
+        <button type="submit" class="btn btn-primary">Run analysis</button>
+      </form>
+    </div>
+  </div>
+
+  <div class="col-lg-7">
+    <div class="section-shell">
+      {% if result %}
+        <h4>Analysis output</h4>
+        <div class="insight-box mb-3">
+          <div><span>Predicted category</span><strong>{{ result.prediction.category }}</strong></div>
+          <div><span>Confidence</span><strong>{{ result.prediction.confidence }}</strong></div>
+          <div><span>Human review required</span><strong>{{ result.prediction.needs_human_review|yesno:'Yes,No' }}</strong></div>
+        </div>
+
+        <div class="insight-box mb-3">
+          <div><span>Predicted priority</span><strong>{{ result.priority.predicted_priority }}</strong></div>
+          <div><span>Review required</span><strong>{{ result.priority.requires_human_review|yesno:'Yes,No' }}</strong></div>
+        </div>
+
+        <h5>Reasons</h5>
+        <ul class="feature-list">
+          {% for reason in result.priority.reasons %}
+            <li>{{ reason }}</li>
+          {% endfor %}
+        </ul>
+
+        <h5 class="mt-4">Similar issues</h5>
+        {% if result.similar %}
+          <ul class="feature-list">
+            {% for item in result.similar %}
+              <li>{{ item.title }} — similarity {{ item.score }}</li>
+            {% endfor %}
+          </ul>
+        {% else %}
+          <p class="text-muted mb-0">No similar reports found.</p>
+        {% endif %}
+      {% else %}
+        <div class="empty-state">
+          <p>Awaiting analysis.</p>
+          <span>Run the AI model to inspect classification and priority suggestions.</span>
+        </div>
+      {% endif %}
+    </div>
+  </div>
+</div>
+{% endblock %}

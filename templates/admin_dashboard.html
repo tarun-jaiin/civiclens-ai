@@ -1,0 +1,150 @@
+{% extends "base.html" %}
+{% block title %}City operations | CivicLens AI{% endblock %}
+{% block content %}
+<section class="workspace-heading">
+  <div>
+    <span class="eyebrow">CITY OPERATIONS / OVERVIEW</span>
+    <h1>Good morning, {{ user.first_name|default:user.username }}.</h1>
+    <p>One live view of citizen reports, locations, and work in progress.</p>
+  </div>
+  <span class="role-chip staff-chip"><i></i> Authorized staff workspace</span>
+</section>
+
+<section class="row g-3 admin-metrics mb-4">
+  <div class="col-6 col-xl-3"><div class="metric-card"><span class="metric-label">Reports in view</span><strong class="metric-value">{{ total_complaints }}</strong><span class="metric-foot">Based on current filters</span></div></div>
+  <div class="col-6 col-xl-3"><div class="metric-card warning"><span class="metric-label">Submitted</span><strong class="metric-value">{{ pending_complaints }}</strong><span class="metric-foot">Waiting for triage</span></div></div>
+  <div class="col-6 col-xl-3"><div class="metric-card danger"><span class="metric-label">High / critical</span><strong class="metric-value">{{ high_priority_complaints }}</strong><span class="metric-foot">Review priority with context</span></div></div>
+  <div class="col-6 col-xl-3"><div class="metric-card success"><span class="metric-label">Resolved</span><strong class="metric-value">{{ resolved_complaints }}</strong><span class="metric-foot">{% if average_resolution_hours != None %}{{ average_resolution_hours }}h average resolution{% else %}No resolved reports in this view{% endif %}</span></div></div>
+  <div class="col-6 col-xl-3"><div class="metric-card danger"><span class="metric-label">SLA overdue</span><strong class="metric-value">{{ sla_breached_complaints }}</strong><span class="metric-foot">Open reports past prototype target</span></div></div>
+  <div class="col-6 col-xl-3"><div class="metric-card warning"><span class="metric-label">Unassigned</span><strong class="metric-value">{{ unassigned_complaints }}</strong><span class="metric-foot">Reports without an owner</span></div></div>
+</section>
+
+<div class="row g-4 mb-4">
+  <div class="col-xl-8">
+    <section class="section-shell map-section h-100">
+      <div class="panel-heading">
+        <div><span class="step-tag">GEOSPATIAL VIEW</span><h2>Where attention is needed</h2></div>
+        <span class="subtle-count">{{ map_reports|length }} located</span>
+      </div>
+      <p class="panel-intro">Pins represent reports with a citizen-provided latitude and longitude.</p>
+      {% if map_reports %}
+        <div id="admin-map" class="map-frame map-large" aria-label="Map of civic reports"></div>
+        {{ map_reports|json_script:"admin-map-data" }}
+      {% else %}
+        <div class="empty-map"><span>⌖</span><strong>No mapped reports in this view.</strong><small>Location pins appear when a report includes map coordinates.</small></div>
+      {% endif %}
+    </section>
+  </div>
+  <div class="col-xl-4">
+    <section class="section-shell chart-shell">
+      <div class="panel-heading"><div><span class="step-tag">ISSUE MIX</span><h2>By category</h2></div></div>
+      {% if total_complaints %}
+        <div class="chart-wrap"><canvas id="category-chart" aria-label="Complaints by category" role="img"></canvas></div>
+        {{ category_chart|json_script:"category-chart-data" }}
+      {% else %}
+        <div class="chart-empty">Category insights will appear when reports arrive.</div>
+      {% endif %}
+    </section>
+  </div>
+</div>
+
+<div class="row g-4 mb-4">
+  <div class="col-lg-5">
+    <section class="section-shell chart-shell">
+      <div class="panel-heading"><div><span class="step-tag">WORKFLOW</span><h2>By status</h2></div></div>
+      {% if total_complaints %}
+        <div class="status-chart-wrap"><canvas id="status-chart" aria-label="Complaints by status" role="img"></canvas></div>
+        {{ status_chart|json_script:"status-chart-data" }}
+      {% else %}
+        <div class="chart-empty">Workflow distribution will appear here.</div>
+      {% endif %}
+    </section>
+  </div>
+  <div class="col-lg-7">
+    <section class="section-shell">
+      <div class="panel-heading"><div><span class="step-tag">OPERATIONS</span><h2>Queue snapshot</h2></div></div>
+      <div class="queue-snapshot">
+        <div><span class="snapshot-icon amber">◷</span><span><strong>{{ pending_complaints }}</strong><small>Submitted</small></span></div>
+        <div><span class="snapshot-icon blue">↗</span><span><strong>{{ in_progress_complaints }}</strong><small>In progress</small></span></div>
+        <div><span class="snapshot-icon green">✓</span><span><strong>{{ resolved_complaints }}</strong><small>Resolved</small></span></div>
+        <div><span class="snapshot-icon red">!</span><span><strong>{{ high_priority_complaints }}</strong><small>High / critical</small></span></div>
+      </div>
+      <p class="method-note">Priority is a triage signal, not an automated decision. Review each report and apply local policy.</p>
+    </section>
+  </div>
+</div>
+
+<section class="section-shell mb-4">
+  <div class="panel-heading"><div><span class="step-tag">SERVICE TEAMS</span><h2>Workload by department</h2></div></div>
+  <div class="department-grid">
+    {% for department in departments %}
+      <div class="department-card"><span>{{ department.name }}</span><strong>{{ department.count }}</strong><small>reports in current view</small></div>
+    {% endfor %}
+  </div>
+</section>
+
+<section class="section-shell queue-shell">
+  <div class="panel-heading queue-heading">
+    <div><span class="step-tag">STAFF WORKSPACE</span><h2>Complaint queue</h2></div>
+    <span class="subtle-count">Up to 30 newest matching reports</span>
+  </div>
+  <form method="get" class="filter-bar">
+    <label class="sr-only" for="search-reports">Search reports</label>
+    <input id="search-reports" name="q" value="{{ query }}" class="form-control search-input" placeholder="Search title or description">
+    <label class="sr-only" for="filter-status">Filter by status</label>
+    <select id="filter-status" name="status" class="form-select">
+      <option value="all">All statuses</option>
+      {% for value, label in status_choices %}<option value="{{ value }}" {% if status_filter == value %}selected{% endif %}>{{ label }}</option>{% endfor %}
+    </select>
+    <label class="sr-only" for="filter-category">Filter by category</label>
+    <select id="filter-category" name="category" class="form-select">
+      <option value="all">All categories</option>
+      {% for value, label in category_choices %}<option value="{{ value }}" {% if category_filter == value %}selected{% endif %}>{{ label }}</option>{% endfor %}
+    </select>
+    <button class="btn btn-primary" type="submit">Filter queue</button>
+    {% if query or status_filter != "all" or category_filter != "all" %}<a class="btn btn-light" href="{% url 'admin-dashboard' %}">Clear</a>{% endif %}
+  </form>
+
+  <div class="table-responsive">
+    <table class="table modern-table queue-table">
+      <thead><tr><th>Report</th><th>Resident</th><th>Category</th><th>Priority</th><th>Status / action</th><th>Submitted</th></tr></thead>
+      <tbody>
+      {% for complaint in complaints %}
+        <tr>
+          <td><a class="queue-report-title" href="{% url 'report-detail' complaint.pk %}">{{ complaint.title }}</a><small class="table-subline">{{ complaint.reference_number }}</small></td>
+          <td>{{ complaint.user.username }}</td>
+          <td>{{ complaint.get_category_display }}</td>
+          <td><span class="badge priority-badge {{ complaint.priority|lower }}">{{ complaint.get_priority_display }}</span></td>
+          <td>
+            <form method="post" action="{% url 'complaint-status-update' complaint.pk %}" class="status-action">
+              {% csrf_token %}
+              <label class="sr-only" for="status-{{ complaint.pk }}">Update {{ complaint.reference_number }} status</label>
+              <select id="status-{{ complaint.pk }}" name="status" class="form-select form-select-sm">
+                {% for value, label in status_choices %}<option value="{{ value }}" {% if complaint.status == value %}selected{% endif %}>{{ label }}</option>{% endfor %}
+              </select>
+              <label class="sr-only" for="priority-{{ complaint.pk }}">Update {{ complaint.reference_number }} priority</label>
+              <select id="priority-{{ complaint.pk }}" name="priority" class="form-select form-select-sm priority-select">
+                {% for value, label in complaint.PRIORITY_CHOICES %}<option value="{{ value }}" {% if complaint.priority == value %}selected{% endif %}>{{ label }}</option>{% endfor %}
+              </select>
+              <label class="sr-only" for="department-{{ complaint.pk }}">Assign {{ complaint.reference_number }} department</label>
+              <select id="department-{{ complaint.pk }}" name="department" class="form-select form-select-sm">
+                {% for value, label in department_choices %}<option value="{{ value }}" {% if complaint.department == value %}selected{% endif %}>{{ label }}</option>{% endfor %}
+              </select>
+              <label class="sr-only" for="assignee-{{ complaint.pk }}">Assign {{ complaint.reference_number }} to staff</label>
+              <select id="assignee-{{ complaint.pk }}" name="assigned_to" class="form-select form-select-sm">
+                <option value="">Unassigned</option>
+                {% for staff_member in staff_users %}<option value="{{ staff_member.pk }}" {% if complaint.assigned_to_id == staff_member.pk %}selected{% endif %}>{{ staff_member.username }}</option>{% endfor %}
+              </select>
+              <button class="btn btn-sm btn-outline-primary" type="submit">Save</button>
+            </form>
+          </td>
+          <td>{{ complaint.created_at|date:"M j, Y" }}</td>
+        </tr>
+      {% empty %}
+        <tr><td colspan="6"><div class="empty-state"><strong>No reports match.</strong><span>Try changing or clearing the filters.</span></div></td></tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</section>
+{% endblock %}

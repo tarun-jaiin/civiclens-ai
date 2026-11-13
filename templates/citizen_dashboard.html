@@ -1,0 +1,120 @@
+{% extends "base.html" %}
+{% block title %}My reports | CivicLens AI{% endblock %}
+{% block content %}
+<section class="workspace-heading">
+  <div>
+    <span class="eyebrow">YOUR NEIGHBORHOOD, IN VIEW</span>
+    <h1>Good morning, {{ user.first_name|default:user.username }}.</h1>
+    <p>Report an issue or check in on something you have already raised.</p>
+  </div>
+  <span class="role-chip citizen-chip"><i></i> Resident workspace</span>
+</section>
+
+<section class="row g-3 citizen-metrics mb-4">
+  <div class="col-md-4"><div class="metric-card"><span class="metric-label">Reports submitted</span><strong class="metric-value">{{ counts.total }}</strong><span class="metric-foot">Your reports</span></div></div>
+  <div class="col-md-4"><div class="metric-card warning"><span class="metric-label">Open reports</span><strong class="metric-value">{{ counts.open }}</strong><span class="metric-foot">Awaiting action or in progress</span></div></div>
+  <div class="col-md-4"><div class="metric-card success"><span class="metric-label">Resolved</span><strong class="metric-value">{{ counts.resolved }}</strong><span class="metric-foot">Marked resolved by the city</span></div></div>
+</section>
+
+<div class="row g-4 align-items-start">
+  <div class="col-xl-5">
+    <section class="section-shell report-shell">
+      <div class="panel-heading">
+        <div><span class="step-tag">NEW REPORT</span><h2>What needs attention?</h2></div>
+        <span class="panel-icon">＋</span>
+      </div>
+      <p class="panel-intro">Share a few details. A precise location helps the right team find it.</p>
+      <form method="post" enctype="multipart/form-data" id="complaint-form">
+        {% csrf_token %}
+        <div class="mb-3">
+          <label class="form-label" for="{{ form.title.id_for_label }}">Short title</label>
+          {{ form.title }}
+          {{ form.title.errors }}
+        </div>
+        <div class="mb-3">
+          <div class="d-flex justify-content-between align-items-center gap-2">
+            <label class="form-label mb-1" for="{{ form.description.id_for_label }}">What happened?</label>
+            <button type="button" class="btn btn-link btn-sm ai-suggest-button" id="ai-suggest">✦ Suggest a category</button>
+          </div>
+          {{ form.description }}
+          <div class="ai-suggestion" id="ai-suggestion" role="status" aria-live="polite"></div>
+          {{ form.description.errors }}
+        </div>
+        <div class="mb-3">
+          <label class="form-label" for="{{ form.category.id_for_label }}">Issue type</label>
+          {{ form.category }}
+          {{ form.category.errors }}
+        </div>
+        <div class="location-heading">
+          <div><label class="form-label mb-0">Pin the issue location</label><small>Click the map or use your current location.</small></div>
+          <button type="button" class="btn btn-outline-primary btn-sm" id="use-location">Use my location</button>
+        </div>
+        <div id="report-map" class="map-frame" aria-label="Select complaint location on map"></div>
+        <p class="map-help">Map data © OpenStreetMap contributors. Your pin is saved with this report.</p>
+        <div class="row g-2">
+          <div class="col-6"><label class="form-label" for="{{ form.latitude.id_for_label }}">Latitude</label>{{ form.latitude }}{{ form.latitude.errors }}</div>
+          <div class="col-6"><label class="form-label" for="{{ form.longitude.id_for_label }}">Longitude</label>{{ form.longitude }}{{ form.longitude.errors }}</div>
+        </div>
+        <div class="mt-3 mb-3">
+          <label class="form-label" for="{{ form.image.id_for_label }}">Photo evidence <span class="optional-label">optional</span></label>
+          {{ form.image }}{{ form.image.errors }}
+        </div>
+        <button type="submit" class="btn btn-primary btn-submit">Send report <span>→</span></button>
+      </form>
+    </section>
+  </div>
+
+  <div class="col-xl-7">
+    <section class="section-shell map-section mb-4">
+      <div class="panel-heading">
+        <div><span class="step-tag">YOUR ACTIVITY</span><h2>Reports on the map</h2></div>
+      </div>
+      <p class="panel-intro">Only your own reports are shown here.</p>
+      {% if map_reports %}
+        <div id="citizen-map" class="map-frame map-large" aria-label="Map of your civic reports"></div>
+        {{ map_reports|json_script:"citizen-map-data" }}
+      {% else %}
+        <div class="empty-map"><span>⌖</span><strong>Your map starts with your first report.</strong><small>Add a location pin when submitting an issue.</small></div>
+      {% endif %}
+    </section>
+
+    <section class="section-shell">
+      <div class="panel-heading">
+        <div><span class="step-tag">FOLLOW THROUGH</span><h2>My reports</h2></div>
+        <span class="subtle-count">{{ counts.total }} total</span>
+      </div>
+      {% if complaints %}
+        <div class="report-list">
+          {% for complaint in complaints %}
+            <a class="report-row" href="{% url 'report-detail' complaint.pk %}">
+              <span class="report-category-icon">{{ forloop.counter|stringformat:"02d" }}</span>
+              <span class="report-main">
+                <strong>{{ complaint.title }}</strong>
+                <small>{{ complaint.reference_number }} · {{ complaint.get_category_display }} · {{ complaint.created_at|date:"M j, Y" }}</small>
+              </span>
+              <span class="badge status-badge {{ complaint.status|lower }}">{{ complaint.get_status_display }}</span>
+              <span class="row-arrow">→</span>
+            </a>
+          {% endfor %}
+        </div>
+      {% else %}
+        <div class="empty-state"><strong>No reports yet.</strong><span>When you submit a report, you can follow its progress here.</span></div>
+      {% endif %}
+    </section>
+
+    <section class="recent-updates mt-4">
+      <div class="panel-heading">
+        <div><span class="step-tag">REAL STATUS CHANGES</span><h2>Recent updates</h2></div>
+      </div>
+      {% for complaint in recent_updates %}
+        <a class="update-row" href="{% url 'report-detail' complaint.pk %}">
+          <span class="update-dot"></span>
+          <span><strong>{{ complaint.reference_number }} · {{ complaint.get_status_display }}</strong><small>{{ complaint.title }} · Updated {{ complaint.updated_at|date:"M j, g:i a" }}</small></span>
+        </a>
+      {% empty %}
+        <p class="text-muted">Status changes will appear here when the city team updates one of your reports.</p>
+      {% endfor %}
+    </section>
+  </div>
+</div>
+{% endblock %}

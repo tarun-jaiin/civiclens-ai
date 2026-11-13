@@ -1,0 +1,10 @@
+.env
+venv/
+.venv/
+__pycache__/
+*.py[cod]
+*.sqlite3
+media/
+staticfiles/
+ai_engine/data/*.joblib
+.DS_Store

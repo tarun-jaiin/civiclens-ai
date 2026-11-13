@@ -1,0 +1,23 @@
+{% extends "base.html" %}
+{% block title %}Resident sign up | CivicLens AI{% endblock %}
+{% block content %}
+<div class="auth-shell section-shell">
+  <span class="eyebrow">CITIZEN PORTAL</span>
+  <h1 class="mt-2">Create your resident account.</h1>
+  <p class="text-muted mb-4">Report local issues and keep track of the city’s response.</p>
+  <form method="post">
+    {% csrf_token %}
+    {% if form.non_field_errors %}<div class="form-error" role="alert">{{ form.non_field_errors }}</div>{% endif %}
+    {% for field in form %}
+      <div class="mb-3">
+        <label class="form-label" for="{{ field.id_for_label }}">{{ field.label }}</label>
+        {{ field }}
+        {% if field.help_text %}<div class="text-muted small mt-1">{{ field.help_text|safe }}</div>{% endif %}
+        {% if field.errors %}<div class="form-error">{{ field.errors }}</div>{% endif %}
+      </div>
+    {% endfor %}
+    <button type="submit" class="btn btn-primary w-100 py-2">Create resident account</button>
+  </form>
+  <p class="mt-3 mb-0 text-center text-muted">Already registered? <a href="{% url 'web-login' %}">Sign in</a></p>
+</div>
+{% endblock %}
