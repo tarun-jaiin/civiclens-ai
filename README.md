@@ -25,7 +25,7 @@ If screenshots are not included in a source distribution, run the app using the 
 2. Sign in to open the staff-only operations dashboard.
 3. Filter/search the citywide queue, inspect report details and map locations, assign a department and staff owner, and update status or priority.
 4. Review the report event history and the prototype SLA-overdue indicators.
-4. Use the staff-only AI triage page to explore category, confidence, priority rationale, and similar reports.
+5. Use the staff-only AI triage page to explore category, confidence, priority rationale, and similar reports.
 
 ## Architecture
 
@@ -38,7 +38,7 @@ flowchart LR
     Django --> DB[(SQLite local / PostgreSQL deployment)]
     Django --> Uploads[Local media volume]
     API --> Classifier[TF-IDF + Logistic Regression]
-    Django --> OSM[OpenStreetMap tiles via Leaflet]
+    Django --> Map[Esri World Street Map tiles via Leaflet]
     Django --> Charts[Chart.js visualizations]
 ```
 
@@ -81,6 +81,17 @@ docker compose exec web python manage.py createsuperuser
 Visit [http://localhost:8000/](http://localhost:8000/). Compose starts PostgreSQL with a persistent named volume, waits for its health check, then the web container applies migrations, collects static assets, and starts Gunicorn. Uploaded photos persist in a separate volume. Stop with `docker compose down`; named volumes (and their data) are retained. **Do not use `docker compose down -v` unless you intend to delete those volumes.**
 
 For a real host, put the web service behind HTTPS, configure `DJANGO_ALLOWED_HOSTS` and `DJANGO_CSRF_TRUSTED_ORIGINS` for the deployment domain, use unique generated secrets, set `DJANGO_DEBUG=False`, and enable `DJANGO_SECURE_SSL_REDIRECT=True` only when TLS termination and forwarded-protocol headers are correctly configured. Back up PostgreSQL and uploaded media; the included Compose file is a demonstrator, not a complete managed production platform.
+
+## Deploy a portfolio demo to Render
+
+The included [render.yaml](render.yaml) is a Render Blueprint for a free web service and PostgreSQL database. To deploy:
+
+1. Push this repository to GitHub and sign in to Render.
+2. In Render, choose **New → Blueprint**, select this GitHub repository, and apply the `render.yaml` blueprint.
+3. Wait for the web service to finish its first build and migration, then open its `onrender.com` URL.
+4. Open the web service's Shell in Render and run `python manage.py createsuperuser` to create the first staff account. Resident self-registration remains available on the public site.
+
+The app accepts Render's `DATABASE_URL` as well as the separate PostgreSQL environment variables used by Docker Compose. The Blueprint uses free-tier resources for demonstration only: free services can sleep, database retention and availability are limited by the provider's current free-tier terms, and uploaded files on an ephemeral web filesystem are not durable. Do not use this deployment for real citizen data. For an operational service, choose a paid database and persistent media storage, set up backups, and review hosting, privacy, and map-tile terms.
 
 ## Roles and routes
 

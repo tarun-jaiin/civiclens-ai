@@ -4,6 +4,7 @@ Django settings for config project.
 
 import os
 from pathlib import Path
+from urllib.parse import unquote, urlsplit
 
 BASE_DIR = Path(__file__).resolve().parent.parent
 
@@ -71,9 +72,35 @@ REST_FRAMEWORK = {
     ],
 }
 
-if os.environ.get("DJANGO_DB_ENGINE", "sqlite").lower() in {"postgres", "postgresql"}:
-    DATABASES = {
-        "default": {
+database_url = os.environ.get("DATABASE_URL")
+if database_url or os.environ.get("DJANGO_DB_ENGINE", "sqlite").lower() in {
+    "postgres",
+    "postgresql",
+}:
+    if database_url:
+        parsed_database_url = urlsplit(database_url)
+        if parsed_database_url.scheme not in {"postgres", "postgresql"}:
+            raise ValueError("DATABASE_URL must use the postgres or postgresql scheme.")
+        database_config = {
+            "ENGINE": "django.db.backends.postgresql",
+            "NAME": unquote(parsed_database_url.path.lstrip("/")),
+            "USER": unquote(parsed_database_url.username or ""),
+            "PASSWORD": unquote(parsed_database_url.password or ""),
+            "HOST": parsed_database_url.hostname or "",
+            "PORT": str(parsed_database_url.port or 5432),
+            "CONN_MAX_AGE": 60,
+        }
+        if parsed_database_url.query:
+            database_config["OPTIONS"] = {
+                key: value
+                for key, value in (
+                    pair.split("=", 1)
+                    for pair in parsed_database_url.query.split("&")
+                    if "=" in pair
+                )
+            }
+    else:
+        database_config = {
             "ENGINE": "django.db.backends.postgresql",
             "NAME": os.environ.get("POSTGRES_DB", "civiclens"),
             "USER": os.environ.get("POSTGRES_USER", "civiclens"),
@@ -82,6 +109,8 @@ if os.environ.get("DJANGO_DB_ENGINE", "sqlite").lower() in {"postgres", "postgre
             "PORT": os.environ.get("POSTGRES_PORT", "5432"),
             "CONN_MAX_AGE": 60,
         }
+    DATABASES = {
+        "default": database_config,
     }
 else:
     DATABASES = {
