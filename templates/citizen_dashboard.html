@@ -55,10 +55,14 @@
           <div class="col-6"><label class="form-label" for="{{ form.latitude.id_for_label }}">Latitude</label>{{ form.latitude }}{{ form.latitude.errors }}</div>
           <div class="col-6"><label class="form-label" for="{{ form.longitude.id_for_label }}">Longitude</label>{{ form.longitude }}{{ form.longitude.errors }}</div>
         </div>
+        {% if media_uploads_enabled %}
         <div class="mt-3 mb-3">
           <label class="form-label" for="{{ form.image.id_for_label }}">Photo evidence <span class="optional-label">optional</span></label>
           {{ form.image }}{{ form.image.errors }}
         </div>
+        {% else %}
+        <p class="form-text mt-3 mb-3">Photo uploads are unavailable on this deployment.</p>
+        {% endif %}
         <button type="submit" class="btn btn-primary btn-submit">Send report <span>→</span></button>
       </form>
     </section>

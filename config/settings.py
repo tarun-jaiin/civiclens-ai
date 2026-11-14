@@ -165,11 +165,12 @@ media_storage_environment = {
 }
 media_storage_endpoint = os.environ.get("AWS_S3_ENDPOINT_URL")
 has_s3_media_storage = all(media_storage_environment.values())
-if IS_VERCEL and not has_s3_media_storage:
+if any(media_storage_environment.values()) and not has_s3_media_storage:
     raise ImproperlyConfigured(
-        "Configure an S3-compatible media bucket on Vercel; function filesystems "
-        "are not persistent."
+        "Configure AWS_STORAGE_BUCKET_NAME, AWS_ACCESS_KEY_ID, and "
+        "AWS_SECRET_ACCESS_KEY together to enable external media storage."
     )
+MEDIA_UPLOADS_ENABLED = not IS_VERCEL or has_s3_media_storage
 STORAGES = {
     "default": (
         {

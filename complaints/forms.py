@@ -1,9 +1,15 @@
 from django import forms
+from django.conf import settings
 
 from .models import Complaint
 
 
 class ComplaintForm(forms.ModelForm):
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        if not settings.MEDIA_UPLOADS_ENABLED:
+            self.fields.pop("image")
+
     class Meta:
         model = Complaint
         fields = ["title", "description", "category", "latitude", "longitude", "image"]

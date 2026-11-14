@@ -1,5 +1,6 @@
 from collections import Counter
 
+from django.conf import settings
 from django.contrib import messages
 from django.contrib.auth.models import User
 from django.contrib.auth import login, logout
@@ -105,6 +106,7 @@ def citizen_dashboard(request):
                 .values("id", "title", "category", "status", "latitude", "longitude")
             ),
             "form": form,
+            "media_uploads_enabled": settings.MEDIA_UPLOADS_ENABLED,
         },
     )
 

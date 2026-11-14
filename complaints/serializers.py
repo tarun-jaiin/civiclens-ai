@@ -1,3 +1,4 @@
+from django.conf import settings
 from rest_framework import serializers
 
 from .models import Complaint
@@ -45,6 +46,13 @@ class ComplaintSerializer(serializers.ModelSerializer):
         if longitude is not None and not -180 <= longitude <= 180:
             raise serializers.ValidationError({"longitude": "Longitude must be between -180 and 180."})
         return attrs
+
+    def validate_image(self, image):
+        if not settings.MEDIA_UPLOADS_ENABLED:
+            raise serializers.ValidationError(
+                "Photo uploads are unavailable on this deployment."
+            )
+        return image
 
     def get_reference_number(self, obj):
         return obj.reference_number

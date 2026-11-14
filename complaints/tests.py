@@ -1,7 +1,12 @@
+from io import BytesIO
+
+from PIL import Image
+from django.core.files.uploadedfile import SimpleUploadedFile
 from django.contrib.auth.models import User
-from django.test import TestCase
+from django.test import TestCase, override_settings
 from rest_framework.test import APIClient
 
+from complaints.forms import ComplaintForm
 from complaints.models import Complaint
 
 
@@ -35,3 +40,26 @@ class CivicLensApiTests(TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertIn("prediction", response.data)
         self.assertIn("category", response.data["prediction"])
+
+    @override_settings(MEDIA_UPLOADS_ENABLED=False)
+    def test_complaint_form_hides_photo_upload_without_media_storage(self):
+        self.assertNotIn("image", ComplaintForm().fields)
+
+    @override_settings(MEDIA_UPLOADS_ENABLED=False)
+    def test_api_rejects_photo_upload_without_media_storage(self):
+        image_buffer = BytesIO()
+        Image.new("RGB", (1, 1)).save(image_buffer, format="JPEG")
+        response = self.client.post(
+            "/api/complaints/",
+            {
+                "title": "Blocked drain",
+                "description": "Water is pooling around a blocked drain.",
+                "category": "WATER",
+                "image": SimpleUploadedFile(
+                    "evidence.jpg", image_buffer.getvalue(), content_type="image/jpeg"
+                ),
+            },
+            format="multipart",
+        )
+        self.assertEqual(response.status_code, 400)
+        self.assertIn("image", response.data)
