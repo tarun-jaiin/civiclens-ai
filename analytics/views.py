@@ -11,7 +11,7 @@ from django.db.models import Avg, F, Q
 from django.shortcuts import get_object_or_404, redirect, render
 from django.views.decorators.http import require_POST
 from rest_framework.decorators import api_view, permission_classes
-from rest_framework.permissions import AllowAny
+from rest_framework.permissions import IsAdminUser
 from rest_framework.response import Response
 
 from ai_engine.services import ComplaintClassifier
@@ -358,7 +358,7 @@ def knowledge_assistant(request):
 
 
 @api_view(["GET"])
-@permission_classes([AllowAny])
+@permission_classes([IsAdminUser])
 def dashboard_api(request):
     complaints = Complaint.objects.all()
     return Response(

@@ -11,16 +11,24 @@ classifier = ComplaintClassifier()
 
 
 @api_view(["POST"])
-@permission_classes([AllowAny])
+@permission_classes([IsAuthenticated])
 def predict_category(request):
     text = request.data.get("text") or request.data.get("description")
-    if not text:
+    if not isinstance(text, str) or not text.strip():
         return Response({"detail": "Text is required."}, status=status.HTTP_400_BAD_REQUEST)
+    if len(text) > 5000:
+        return Response(
+            {"detail": "Text must be 5000 characters or fewer."},
+            status=status.HTTP_400_BAD_REQUEST,
+        )
 
     result = classifier.predict(text)
+    complaints = Complaint.objects.order_by("-created_at")
+    if not request.user.is_staff:
+        complaints = complaints.filter(user=request.user)
     similar = classifier.find_similar_complaints(
         text,
-        list(Complaint.objects.order_by("-created_at").values("id", "title", "description")[:10]),
+        list(complaints.values("id", "title", "description")[:10]),
     )
     priority = classifier.explain_priority(text, result["category"], similar_reports=len(similar))
     return Response({"prediction": result, "similar_reports": similar, "priority": priority})

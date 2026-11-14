@@ -1,6 +1,6 @@
 # CivicLens AI
 
-**A civic issue reporting and operations prototype.** Residents submit local problems with a map pin and optional photo. Authorized city staff review a separate citywide queue, update report status, and use map, chart, and AI-assisted triage views.
+**A civic issue reporting and operations prototype.** Residents submit local problems—including road damage, water supply, traffic signals, and public safety—with a map pin and optional photo. Authorized city staff review a separate citywide queue, update report status, and use map, chart, and AI-assisted triage views.
 
 > **Prototype notice:** this is a portfolio/demo application, not a municipal production service. The included classifier uses a small synthetic starter dataset. Model output and rule-based priority suggestions are not validated for operational decisions; staff must review them. Do not enter sensitive personal information.
 
@@ -49,6 +49,7 @@ flowchart LR
 - **Leaflet + Esri World Street Map:** clickable report pins using Esri's public street basemap and its required source attribution. Tile access depends on internet connectivity and Esri's usage terms; production deployments with significant traffic should select a provider and plan that meet their needs.
 - **Chart.js:** accessible, responsive category and status visualizations based on database records.
 - **scikit-learn:** transparent TF-IDF and Logistic Regression baseline. The sample training corpus is synthetic, intentionally small, and not a claim of real-world accuracy.
+- **Guided onboarding:** role-specific quick tours help residents and staff learn the interface. The tour works offline; it is not a conversational LLM.
 
 ## Run locally
 
@@ -89,7 +90,7 @@ Vercel detects this Django project through `WSGI_APPLICATION` and the Python dep
 1. Import `tarun-jaiin/civiclens-ai` from the Vercel dashboard and keep the project root at the repository root.
 2. Add a managed PostgreSQL database through Vercel Marketplace (for example, Neon) and make its pooled PostgreSQL URL available to the project as `DATABASE_URL`.
 3. Add `DJANGO_SECRET_KEY` (generate one with `python -c "import secrets; print(secrets.token_urlsafe(50))"`), `DJANGO_DEBUG=False`, and `DJANGO_SECURE_SSL_REDIRECT=True`. Add any custom domain to `DJANGO_ALLOWED_HOSTS` and its `https://` origin to `DJANGO_CSRF_TRUSTED_ORIGINS`. Vercel deployment hostnames are added automatically.
-4. Deploy from Vercel. For initial database setup, install the Vercel CLI, link the project with `vercel link`, pull the production variables into an untracked local file with `vercel env pull .env.vercel --environment=production`, then source that file and run `python manage.py migrate`. Keep `.env.vercel` private and out of Git.
+4. Deploy from Vercel. Apply migrations once against the managed database from a secure environment that can access its pooled connection URL. Vercel does not allow sensitive production variables to be pulled through `vercel env pull`; use an approved secret manager or the database provider's secure connection flow instead. Never print the URL or commit it to Git.
 5. Create the first staff account using a local environment with the production database variables loaded: `python manage.py createsuperuser`. Resident registration remains public.
 
 No object-storage service is required. Photo uploads are disabled on Vercel by default because function filesystems are ephemeral; they remain available locally. If durable report photos are needed later, configure an S3-compatible provider by setting `AWS_STORAGE_BUCKET_NAME`, `AWS_ACCESS_KEY_ID`, and `AWS_SECRET_ACCESS_KEY` together, plus `AWS_S3_ENDPOINT_URL` and `AWS_S3_REGION_NAME` when your provider requires them. Vercel Functions use an ephemeral writable `/tmp`, used for the classifier's generated model cache. Database migrations are intentionally not run during builds; run them once against the managed database before using the deployment. Review Vercel and database provider quotas or charges before sharing the app publicly.
@@ -127,9 +128,11 @@ Unauthorized users are redirected or denied. Residents cannot view another resid
 - `GET /api/auth/profile/` — authenticated profile
 - `GET, POST /api/complaints/` — authenticated; residents see/create their own reports, staff can view the citywide list
 - `GET /api/complaints/<id>/` — authenticated report detail subject to ownership
-- `POST /api/ai/predict/` — category, confidence, priority rationale, and similar-report suggestions
+- `POST /api/ai/predict/` — authenticated; residents receive matches from their own reports, staff can compare the citywide queue
 - `GET /api/ai/status/` — model status and evaluation metrics when available
-- `GET /api/analytics/dashboard/` — aggregate dashboard counts
+- `GET /api/analytics/dashboard/` — staff-only aggregate dashboard counts
+- `GET /api/schema/` — machine-readable OpenAPI schema
+- `GET /healthz/` — application and database readiness check
 
 The browser UI uses Django session authentication and CSRF-protected form posts. The existing token-authenticated API remains available.
 
@@ -137,10 +140,11 @@ The browser UI uses Django session authentication and CSRF-protected form posts.
 
 ```bash
 python manage.py check
+python manage.py makemigrations --check --dry-run
 python manage.py test
 ```
 
-Tests cover core API and reporting behavior. Before a production deployment, add broader role-permission, upload validation, concurrency, and browser-level end-to-end coverage.
+GitHub Actions runs these checks for pull requests and pushes to `main`. The OpenAPI schema is available at `/api/schema/`; `/healthz/` checks application and database readiness.
 
 ## Known limitations and next steps
 
@@ -150,4 +154,6 @@ Tests cover core API and reporting behavior. Before a production deployment, add
 - The map uses browser/network-hosted Esri World Street Map tiles; production traffic may require a contracted tile plan or self-hosting.
 - No email/SMS delivery or persistent notification center. Assignment, event history, feedback, and SLA indicators are prototype workflows; SLA targets are hard-coded examples and must be replaced with approved local policy before operational use.
 - Uploaded-image serving and database backups need deployment-specific storage/retention policies.
-- Add CI, automated browser tests, accessibility review, and a managed HTTPS deployment before presenting this as production-ready.
+- Add automated browser tests and a formal accessibility review before presenting this as production-ready.
+
+See [docs/SDLC_AND_DEMO.md](docs/SDLC_AND_DEMO.md) for a step-by-step development, GitHub review, Vercel release, and interview demo guide.

@@ -4,8 +4,11 @@ from django.contrib import admin
 from django.conf import settings
 from django.conf.urls.static import static
 from django.urls import include, path
+from rest_framework.renderers import JSONOpenAPIRenderer
+from rest_framework.schemas import get_schema_view
 
 from analytics import views as analytics_views
+from analytics.health import health_check
 
 urlpatterns = [
     path("admin/", admin.site.urls),
@@ -27,6 +30,16 @@ urlpatterns = [
     ),
     path("dashboard/", analytics_views.admin_dashboard, name="admin-dashboard"),
     path("assistant/", analytics_views.knowledge_assistant, name="ai-assistant"),
+    path("healthz/", health_check, name="health-check"),
+    path(
+        "api/schema/",
+        get_schema_view(
+            title="CivicLens AI API",
+            description="CivicLens reporting and operations API",
+            renderer_classes=[JSONOpenAPIRenderer],
+        ),
+        name="openapi-schema",
+    ),
     path("api/auth/", include("accounts.urls")),
     path("api/complaints/", include("complaints.urls")),
     path("api/analytics/", include("analytics.urls")),

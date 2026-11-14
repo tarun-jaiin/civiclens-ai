@@ -189,7 +189,11 @@
       try {
         const response = await fetch("/api/ai/predict/", {
           method: "POST",
-          headers: { "Content-Type": "application/json" },
+          credentials: "same-origin",
+          headers: {
+            "Content-Type": "application/json",
+            "X-CSRFToken": document.querySelector("[name=csrfmiddlewaretoken]")?.value || "",
+          },
           body: JSON.stringify({ text }),
         });
         if (!response.ok) throw new Error(`Prediction request returned ${response.status}`);
@@ -208,11 +212,93 @@
     });
   }
 
+  function initProductGuide() {
+    const dialog = document.getElementById("guide-dialog");
+    const openButton = document.getElementById("guide-open");
+    const closeButton = document.getElementById("guide-close");
+    const previousButton = document.getElementById("guide-previous");
+    const nextButton = document.getElementById("guide-next");
+    const copy = document.getElementById("guide-copy");
+    const progress = document.getElementById("guide-progress");
+    if (!dialog || !openButton || !closeButton || !previousButton || !nextButton || !copy || !progress) return;
+
+    const guides = {
+      resident: [
+        { target: ".citizen-metrics", text: "Start here to see how many reports you have submitted, which are still open, and which are resolved." },
+        { target: "#complaint-form", text: "Describe the issue, choose a category, and add a useful short title. Category suggestions are optional—check them before submitting." },
+        { target: "#report-map", text: "Pin the location by clicking the map or using your location. A clear location helps city staff find the issue." },
+        { target: ".report-list", text: "Follow each report here. Open a report to see its status, staff updates, and resolution history." },
+      ],
+      staff: [
+        { target: ".admin-metrics", text: "These cards summarize the current queue, including urgent, unassigned, and overdue reports." },
+        { target: ".filter-bar", text: "Search and filter the queue to focus on a status or issue category." },
+        { target: "#admin-map", text: "Use the map to understand where reports are located. A pin only appears when the resident provides coordinates." },
+        { target: ".queue-table", text: "Open a report to review its details and history, then assign a department or update its status. Every change is recorded." },
+        { target: "#ai-assistant-link", text: "AI triage offers suggestions, not decisions. Review the report and use your team's policy before acting." },
+      ],
+      visitor: [
+        { target: ".role-cards", text: "Residents can create an account to report local issues and follow their own reports." },
+        { target: "#guide-open", text: "City staff sign in with an account provisioned by an administrator. Staff accounts cannot be created through public sign-up." },
+      ],
+    };
+    const steps = guides[document.body.dataset.userRole] || guides.visitor;
+    let activeStep = 0;
+    let highlighted = null;
+
+    function renderStep() {
+      const step = steps[activeStep];
+      progress.textContent = `Step ${activeStep + 1} of ${steps.length}`;
+      copy.textContent = step.text;
+      previousButton.disabled = activeStep === 0;
+      nextButton.textContent = activeStep === steps.length - 1 ? "Done" : "Next";
+      if (highlighted) highlighted.classList.remove("guide-highlight");
+      highlighted = document.querySelector(step.target);
+      if (highlighted) {
+        highlighted.classList.add("guide-highlight");
+        highlighted.scrollIntoView({ behavior: "smooth", block: "center" });
+      }
+    }
+
+    function closeGuide() {
+      if (highlighted) highlighted.classList.remove("guide-highlight");
+      highlighted = null;
+      dialog.close();
+      openButton.focus();
+    }
+
+    openButton.addEventListener("click", () => {
+      activeStep = 0;
+      renderStep();
+      dialog.showModal();
+      nextButton.focus();
+    });
+    closeButton.addEventListener("click", closeGuide);
+    previousButton.addEventListener("click", () => {
+      if (activeStep > 0) {
+        activeStep -= 1;
+        renderStep();
+      }
+    });
+    nextButton.addEventListener("click", () => {
+      if (activeStep === steps.length - 1) {
+        closeGuide();
+        return;
+      }
+      activeStep += 1;
+      renderStep();
+    });
+    dialog.addEventListener("close", () => {
+      if (highlighted) highlighted.classList.remove("guide-highlight");
+      highlighted = null;
+    });
+  }
+
   document.addEventListener("DOMContentLoaded", () => {
     initReportMap();
     initOverviewMaps();
     initComplaintDetailMap();
     initCharts();
     initAiSuggestion();
+    initProductGuide();
   });
 })();

@@ -12,8 +12,11 @@ class Complaint(models.Model):
         ("ROAD_DAMAGE", "Road Damage"),
         ("GARBAGE", "Garbage"),
         ("WATER_LEAKAGE", "Water Leakage"),
+        ("WATER_SUPPLY", "Water Supply"),
         ("STREETLIGHT", "Streetlight"),
+        ("TRAFFIC_SIGNALS", "Traffic Signals"),
         ("DRAINAGE", "Drainage"),
+        ("PUBLIC_SAFETY", "Public Safety"),
         ("OTHER", "Other"),
     ]
 

@@ -295,3 +295,27 @@ class RoleSpecificWorkspaceTests(TestCase):
         self.report.refresh_from_db()
         self.assertEqual(response.status_code, 403)
         self.assertEqual(self.report.status, "SUBMITTED")
+
+    def test_dashboard_api_requires_staff_access(self):
+        client = APIClient()
+        self.assertEqual(client.get("/api/analytics/dashboard/").status_code, 401)
+        client.force_authenticate(user=self.citizen)
+        self.assertEqual(client.get("/api/analytics/dashboard/").status_code, 403)
+        client.force_authenticate(user=self.staff)
+        self.assertEqual(client.get("/api/analytics/dashboard/").status_code, 200)
+
+    def test_health_endpoint_reports_database_status(self):
+        response = self.client.get(reverse("health-check"))
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.json(), {"status": "ok", "database": "ok"})
+
+    def test_api_schema_is_available(self):
+        response = self.client.get(reverse("openapi-schema"))
+        self.assertEqual(response.status_code, 200)
+        self.assertIn(b"openapi", response.content.lower())
+
+    def test_authenticated_workspaces_include_quick_guide(self):
+        self.client.force_login(self.citizen)
+        response = self.client.get(reverse("citizen-dashboard"))
+        self.assertContains(response, "CIVICLENS QUICK GUIDE")
+        self.assertContains(response, 'id="guide-dialog"')

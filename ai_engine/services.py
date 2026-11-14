@@ -29,15 +29,31 @@ SYNTHETIC_TRAINING_DATA = [
     ("WATER_LEAKAGE", "Water pipe burst near apartment complex causing flooding and property damage."),
     ("WATER_LEAKAGE", "Leakage from underground water tank is wasting potable water and wetting road."),
     ("WATER_LEAKAGE", "Continuous water leak from street line creating puddles and possible contamination."),
+    ("WATER_LEAKAGE", "A leaking pipe is spraying water across the street."),
+    ("WATER_SUPPLY", "Our neighborhood has had no running water since yesterday."),
+    ("WATER_SUPPLY", "The municipal water supply is irregular and pressure is very low."),
+    ("WATER_SUPPLY", "Residents have not received the scheduled water delivery."),
+    ("WATER_SUPPLY", "Tap water service is interrupted across the apartment block."),
     ("STREETLIGHT", "Streetlamp is not working near intersection and pedestrians feel unsafe at night."),
     ("STREETLIGHT", "Broken street light on residential street has been dark for several days."),
     ("STREETLIGHT", "Power outage in public lighting near bus stop leaving the area unsafe."),
+    ("STREETLIGHT", "The lamp on the footpath stays off after sunset."),
+    ("TRAFFIC_SIGNALS", "Traffic lights at the main junction are not changing from red."),
+    ("TRAFFIC_SIGNALS", "The pedestrian crossing signal is broken near the school."),
+    ("TRAFFIC_SIGNALS", "A traffic signal is dark and vehicles are crossing unsafely."),
+    ("TRAFFIC_SIGNALS", "The junction signal is malfunctioning and causing long queues."),
     ("DRAINAGE", "Blocked drain overflowing on road and causing traffic disruption after rain."),
     ("DRAINAGE", "Open drain clogged with plastic and garbage causing sewage backup."),
     ("DRAINAGE", "Sewage water stagnant in neighborhood drain after heavy rainfall."),
+    ("DRAINAGE", "Storm water is not draining from the street."),
+    ("PUBLIC_SAFETY", "A fallen tree is blocking the sidewalk and creating a safety hazard."),
+    ("PUBLIC_SAFETY", "A damaged manhole cover is dangerous for pedestrians."),
+    ("PUBLIC_SAFETY", "Exposed electrical wires are hanging near a public walkway."),
+    ("PUBLIC_SAFETY", "A loose structure in the park could fall on visitors."),
     ("OTHER", "Damaged public bench at park entrance needs replacement."),
     ("OTHER", "Broken signboard near community center needs maintenance."),
     ("OTHER", "Public safety concern with fallen tree branch blocking path."),
+    ("OTHER", "A public facility needs maintenance."),
 ]
 
 
@@ -50,8 +66,11 @@ class ComplaintClassifier:
             "ROAD_DAMAGE",
             "GARBAGE",
             "WATER_LEAKAGE",
+            "WATER_SUPPLY",
             "STREETLIGHT",
+            "TRAFFIC_SIGNALS",
             "DRAINAGE",
+            "PUBLIC_SAFETY",
             "OTHER",
         ]
 
@@ -59,7 +78,7 @@ class ComplaintClassifier:
         labels = [category for category, _ in SYNTHETIC_TRAINING_DATA]
         texts = [description for _, description in SYNTHETIC_TRAINING_DATA]
         X_train, X_test, y_train, y_test = train_test_split(
-            texts, labels, test_size=0.25, random_state=42
+            texts, labels, test_size=0.25, random_state=42, stratify=labels
         )
 
         model = Pipeline(
@@ -86,6 +105,8 @@ class ComplaintClassifier:
     def load(self):
         if self.model_path.exists():
             payload = joblib.load(self.model_path)
+            if payload.get("labels") != self.label_map:
+                return None
             self.pipeline = payload["model"]
             return payload
         return None
@@ -113,7 +134,14 @@ class ComplaintClassifier:
     def explain_priority(self, text, category, similar_reports=0, risk_keywords=None):
         risk_keywords = risk_keywords or []
         keyword_score = 0
-        if category in {"ROAD_DAMAGE", "DRAINAGE", "WATER_LEAKAGE"}:
+        if category in {
+            "ROAD_DAMAGE",
+            "DRAINAGE",
+            "WATER_LEAKAGE",
+            "WATER_SUPPLY",
+            "TRAFFIC_SIGNALS",
+            "PUBLIC_SAFETY",
+        }:
             keyword_score += 1
         if any(word.lower() in text.lower() for word in ["flood", "unsafe", "breach", "overflow", "danger", "crack"]):
             keyword_score += 2

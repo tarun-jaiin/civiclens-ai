@@ -41,6 +41,41 @@ class CivicLensApiTests(TestCase):
         self.assertIn("prediction", response.data)
         self.assertIn("category", response.data["prediction"])
 
+    def test_ai_prediction_rejects_anonymous_requests(self):
+        self.client.force_authenticate(user=None)
+        response = self.client.post(
+            "/api/ai/predict/", {"text": "Water leak near the road."}, format="json"
+        )
+        self.assertEqual(response.status_code, 401)
+
+    def test_ai_prediction_does_not_return_other_residents_reports(self):
+        other_user = User.objects.create_user(username="other-citizen", password="SafePass!12345")
+        Complaint.objects.create(
+            user=other_user,
+            title="Private water supply report",
+            description="Water supply stopped in the neighborhood.",
+            category="WATER_SUPPLY",
+        )
+        response = self.client.post(
+            "/api/ai/predict/",
+            {"text": "Water supply stopped in the neighborhood."},
+            format="json",
+        )
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.data["similar_reports"], [])
+
+    def test_ai_prediction_accepts_new_category_labels(self):
+        response = self.client.post(
+            "/api/ai/predict/",
+            {"text": "The traffic signal at the junction is broken and dangerous."},
+            format="json",
+        )
+        self.assertEqual(response.status_code, 200)
+        self.assertIn(
+            response.data["prediction"]["category"],
+            {choice[0] for choice in Complaint.CATEGORY_CHOICES},
+        )
+
     @override_settings(MEDIA_UPLOADS_ENABLED=False)
     def test_complaint_form_hides_photo_upload_without_media_storage(self):
         self.assertNotIn("image", ComplaintForm().fields)
