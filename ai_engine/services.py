@@ -1,4 +1,6 @@
 import json
+import os
+import tempfile
 from pathlib import Path
 
 import joblib
@@ -10,7 +12,12 @@ from sklearn.model_selection import train_test_split
 from sklearn.pipeline import Pipeline
 
 
-MODEL_PATH = Path(__file__).resolve().parent / "data" / "complaint_classifier.joblib"
+default_model_path = (
+    Path(tempfile.gettempdir()) / "civiclens-complaint-classifier.joblib"
+    if os.environ.get("VERCEL") == "1"
+    else Path(__file__).resolve().parent / "data" / "complaint_classifier.joblib"
+)
+MODEL_PATH = Path(os.environ.get("AI_MODEL_PATH", str(default_model_path)))
 
 SYNTHETIC_TRAINING_DATA = [
     ("ROAD_DAMAGE", "Large pothole on main road near school making it unsafe for children and cyclists."),

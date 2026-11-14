@@ -36,7 +36,7 @@ flowchart LR
     Django --> Auth[Django authentication and role checks]
     Django --> API[DRF APIs]
     Django --> DB[(SQLite local / PostgreSQL deployment)]
-    Django --> Uploads[Local media volume]
+    Django --> Uploads[Local media or S3-compatible object storage]
     API --> Classifier[TF-IDF + Logistic Regression]
     Django --> Map[Esri World Street Map tiles via Leaflet]
     Django --> Charts[Chart.js visualizations]
@@ -81,6 +81,19 @@ docker compose exec web python manage.py createsuperuser
 Visit [http://localhost:8000/](http://localhost:8000/). Compose starts PostgreSQL with a persistent named volume, waits for its health check, then the web container applies migrations, collects static assets, and starts Gunicorn. Uploaded photos persist in a separate volume. Stop with `docker compose down`; named volumes (and their data) are retained. **Do not use `docker compose down -v` unless you intend to delete those volumes.**
 
 For a real host, put the web service behind HTTPS, configure `DJANGO_ALLOWED_HOSTS` and `DJANGO_CSRF_TRUSTED_ORIGINS` for the deployment domain, use unique generated secrets, set `DJANGO_DEBUG=False`, and enable `DJANGO_SECURE_SSL_REDIRECT=True` only when TLS termination and forwarded-protocol headers are correctly configured. Back up PostgreSQL and uploaded media; the included Compose file is a demonstrator, not a complete managed production platform.
+
+## Deploy to Vercel
+
+Vercel detects this Django project through `WSGI_APPLICATION` and the Python dependencies; no custom `vercel.json` or build command is needed. It collects `STATIC_ROOT` assets during deployment. Do not use SQLite or the function filesystem for persistent app data.
+
+1. Import `tarun-jaiin/civiclens-ai` from the Vercel dashboard and keep the project root at the repository root.
+2. Add a managed PostgreSQL database through Vercel Marketplace (for example, Neon) and make its pooled PostgreSQL URL available to the project as `DATABASE_URL`.
+3. Create an S3-compatible bucket for report photos (for example, Cloudflare R2 or AWS S3), then add `AWS_STORAGE_BUCKET_NAME`, `AWS_ACCESS_KEY_ID`, and `AWS_SECRET_ACCESS_KEY` as Vercel environment variables. Set `AWS_S3_ENDPOINT_URL` for R2 or other S3-compatible providers, and `AWS_S3_REGION_NAME` if required (R2 uses `auto`; AWS S3 defaults to `us-east-1`).
+4. Add `DJANGO_SECRET_KEY` (generate one with `python -c "import secrets; print(secrets.token_urlsafe(50))"`), `DJANGO_DEBUG=False`, and `DJANGO_SECURE_SSL_REDIRECT=True`. Add any custom domain to `DJANGO_ALLOWED_HOSTS` and its `https://` origin to `DJANGO_CSRF_TRUSTED_ORIGINS`. Vercel deployment hostnames are added automatically.
+5. Deploy from Vercel. For initial database setup, install the Vercel CLI, link the project with `vercel link`, pull the production variables into an untracked local file with `vercel env pull .env.vercel --environment=production`, then source that file and run `python manage.py migrate`. Keep `.env.vercel` private and out of Git.
+6. Create the first staff account using a local environment with the production database variables loaded: `python manage.py createsuperuser`. Resident registration remains public.
+
+Vercel Functions have an ephemeral writable `/tmp`, used only for the classifier's generated model cache. Uploaded photos use the configured external bucket so they survive function restarts. Database migrations are intentionally not run during builds; run them once against the managed database before using the deployment. Vercel and the database/object-storage providers may have separate quotas or charges—review their current plans before sharing the app publicly.
 
 ## Deploy a portfolio demo to Render
 

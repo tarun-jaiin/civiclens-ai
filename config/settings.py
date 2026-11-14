@@ -6,16 +6,35 @@ import os
 from pathlib import Path
 from urllib.parse import unquote, urlsplit
 
+from django.core.exceptions import ImproperlyConfigured
+
 BASE_DIR = Path(__file__).resolve().parent.parent
 
-SECRET_KEY = os.environ.get("DJANGO_SECRET_KEY", "django-insecure-dev-key-change-before-deploy")
-DEBUG = os.environ.get("DJANGO_DEBUG", "True").lower() == "true"
-ALLOWED_HOSTS = os.environ.get("DJANGO_ALLOWED_HOSTS", "localhost,127.0.0.1,testserver").split(",")
-CSRF_TRUSTED_ORIGINS = [
-    origin
-    for origin in os.environ.get("DJANGO_CSRF_TRUSTED_ORIGINS", "").split(",")
-    if origin
+IS_VERCEL = os.environ.get("VERCEL") == "1"
+
+SECRET_KEY = os.environ.get("DJANGO_SECRET_KEY")
+if IS_VERCEL and not SECRET_KEY:
+    raise ImproperlyConfigured("DJANGO_SECRET_KEY must be configured for Vercel deployments.")
+SECRET_KEY = SECRET_KEY or "django-insecure-dev-key-change-before-deploy"
+DEBUG = os.environ.get("DJANGO_DEBUG", "False" if IS_VERCEL else "True").lower() == "true"
+
+ALLOWED_HOSTS = [
+    host.strip()
+    for host in os.environ.get(
+        "DJANGO_ALLOWED_HOSTS", "localhost,127.0.0.1,testserver"
+    ).split(",")
+    if host.strip()
 ]
+CSRF_TRUSTED_ORIGINS = [
+    origin.strip()
+    for origin in os.environ.get("DJANGO_CSRF_TRUSTED_ORIGINS", "").split(",")
+    if origin.strip()
+]
+for vercel_host_variable in ("VERCEL_URL", "VERCEL_PROJECT_PRODUCTION_URL"):
+    vercel_host = os.environ.get(vercel_host_variable)
+    if vercel_host:
+        ALLOWED_HOSTS.append(vercel_host)
+        CSRF_TRUSTED_ORIGINS.append(f"https://{vercel_host}")
 
 INSTALLED_APPS = [
     "django.contrib.admin",
@@ -73,6 +92,10 @@ REST_FRAMEWORK = {
 }
 
 database_url = os.environ.get("DATABASE_URL")
+if IS_VERCEL and not database_url:
+    raise ImproperlyConfigured(
+        "DATABASE_URL must point to a persistent PostgreSQL database on Vercel."
+    )
 if database_url or os.environ.get("DJANGO_DB_ENGINE", "sqlite").lower() in {
     "postgres",
     "postgresql",
@@ -88,7 +111,7 @@ if database_url or os.environ.get("DJANGO_DB_ENGINE", "sqlite").lower() in {
             "PASSWORD": unquote(parsed_database_url.password or ""),
             "HOST": parsed_database_url.hostname or "",
             "PORT": str(parsed_database_url.port or 5432),
-            "CONN_MAX_AGE": 60,
+            "CONN_MAX_AGE": 0 if IS_VERCEL else 60,
         }
         if parsed_database_url.query:
             database_config["OPTIONS"] = {
@@ -135,8 +158,37 @@ USE_TZ = True
 STATIC_URL = "/static/"
 STATICFILES_DIRS = [BASE_DIR / "static"]
 STATIC_ROOT = BASE_DIR / "staticfiles"
+media_storage_environment = {
+    "bucket_name": os.environ.get("AWS_STORAGE_BUCKET_NAME"),
+    "access_key": os.environ.get("AWS_ACCESS_KEY_ID"),
+    "secret_key": os.environ.get("AWS_SECRET_ACCESS_KEY"),
+}
+media_storage_endpoint = os.environ.get("AWS_S3_ENDPOINT_URL")
+has_s3_media_storage = all(media_storage_environment.values())
+if IS_VERCEL and not has_s3_media_storage:
+    raise ImproperlyConfigured(
+        "Configure an S3-compatible media bucket on Vercel; function filesystems "
+        "are not persistent."
+    )
 STORAGES = {
-    "default": {"BACKEND": "django.core.files.storage.FileSystemStorage"},
+    "default": (
+        {
+            "BACKEND": "storages.backends.s3.S3Storage",
+            "OPTIONS": {
+                **media_storage_environment,
+                "region_name": os.environ.get(
+                    "AWS_S3_REGION_NAME", "auto" if media_storage_endpoint else "us-east-1"
+                ),
+                **(
+                    {"endpoint_url": media_storage_endpoint}
+                    if media_storage_endpoint
+                    else {}
+                ),
+            },
+        }
+        if has_s3_media_storage
+        else {"BACKEND": "django.core.files.storage.FileSystemStorage"}
+    ),
     "staticfiles": {
         "BACKEND": "whitenoise.storage.CompressedManifestStaticFilesStorage"
     },
